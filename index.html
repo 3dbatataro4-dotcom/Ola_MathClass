@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+    <title>奧拉的數學教室</title>
+    <link rel="icon" href="https://file.garden/aWe99vhwaGcNwkok/%E6%B6%88%E6%B6%88%E6%A8%82/item_7%20(1).png">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Nunito:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 奧拉冷色系 v16 (旗艦版) */
+            --bg-grad: linear-gradient(150deg, #A3D7F0 0%, #e8eaf6 100%);
+            --glass: rgba(255, 255, 255, 0.94);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.8);
+            --shadow: 0 10px 30px rgba(55, 71, 79, 0.12);
+            
+            --primary: #455a64;
+            --primary-dark: #263238;
+            --accent: #039be5;
+            --accent-light: #b3e5fc;
+            --success: #66bb6a;
+            --error: #ef5350;
+            --warn: #ffa726;
+            
+            --radius: 20px;
+            --font-main: 'Noto Sans TC', sans-serif;
+            --font-num: 'Nunito', sans-serif;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+
+        body {
+            margin: 0; padding: 0; width: 100%; height: 100vh;
+            background: var(--bg-grad);
+            font-family: var(--font-main); color: var(--primary);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* --- UI 元件 --- */
+        .glass-panel {
+            background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: var(--glass-border); border-radius: var(--radius); box-shadow: var(--shadow);
+        }
+
+        .btn {
+            background: #fff; border: 1px solid #cfd8dc; color: var(--primary);
+            padding: 10px 22px; border-radius: 50px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 0 #b0bec5; font-size: 0.95rem; transition: transform 0.1s;
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+        }
+        .btn:active { transform: translateY(4px); box-shadow: none; background: #eceff1; }
+        .btn.active { background: var(--accent); color: white; border-color: var(--accent); box-shadow: 0 4px 0 #0277bd; }
+
+        /* --- 頂部 --- */
+        header {
+            flex: 0 0 auto; padding: 10px 15px; z-index: 100;
+            display: flex; align-items: center; gap: 15px;
+        }
+        .avatar {
+            width: 64px; height: 64px; border-radius: 50%;
+            border: 3px solid #fff; object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+        .dialogue { font-size: 0.9rem; font-weight: 500; margin-bottom: 4px; color: var(--primary-dark); }
+        .score { 
+            align-self: flex-start; background: rgba(255,255,255,0.8);
+            padding: 2px 12px; border-radius: 12px; font-size: 0.9rem;
+            color: var(--accent); font-weight: 800; font-family: var(--font-num);
+        }
+
+        /* --- 視圖 --- */
+        main { flex: 1; position: relative; width: 100%; overflow: hidden; }
+        .view {
+            position: absolute; inset: 0; padding: 20px; display: none;
+            flex-direction: column; align-items: center; overflow-y: auto;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .view.active { display: flex; opacity: 1; }
+
+        /* --- 選單 --- */
+        .menu-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 15px;
+            width: 100%; max-width: 500px; padding-bottom: 60px;
+        }
+        .card {
+            display: flex; flex-direction: column; align-items: center; text-align: center;
+            padding: 20px 10px; cursor: pointer; transition: transform 0.1s;
+        }
+        .card:active { transform: scale(0.96); }
+        .c-icon { font-size: 2.2rem; margin-bottom: 8px; }
+        .c-title { font-weight: bold; font-size: 1rem; color: var(--primary-dark); }
+        .c-desc { font-size: 0.75rem; color: #90a4ae; margin-top: 2px; }
+
+        /* --- 遊戲通用 --- */
+        .toolbar { width: 100%; max-width: 450px; display: flex; justify-content: space-between; margin-bottom: 10px; min-height: 40px; align-items: center; }
+        .stage { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; position: relative; }
+        .controls { margin-top: 20px; display: flex; gap: 10px; justify-content: center; width: 100%; padding-bottom: 20px; }
+        
+        /* 統一正方形容器 */
+        .board-sq {
+            width: 90vmin; height: 90vmin; max-width: 380px; max-height: 380px;
+            background: #cfd8dc; border-radius: 16px; position: relative;
+            touch-action: none; user-select: none; box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        /* 1. 2048 (Colors & Anim Fixed) */
+        .g2048-cell { position: absolute; width: 22.5%; height: 22.5%; background: rgba(255,255,255,0.5); border-radius: 8px; }
+        .tile {
+            position: absolute; width: 22.5%; height: 22.5%; border-radius: 8px;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 2rem; font-weight: 800; color: #fff; font-family: var(--font-num);
+            transition: top 0.1s ease-in-out, left 0.1s ease-in-out, transform 0.1s;
+            z-index: 10; box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        @media (max-width: 350px) { .tile { font-size: 1.5rem; } }
+        
+        /* Specific Colors */
+        .tile[data-v="2"] { background: #b3e5fc; color: #455a64; }
+        .tile[data-v="4"] { background: #81d4fa; color: #fff; }
+        .tile[data-v="8"] { background: #4fc3f7; }
+        .tile[data-v="16"] { background: #29b6f6; }
+        .tile[data-v="32"] { background: #039be5; }
+        .tile[data-v="64"] { background: #0288d1; }
+        .tile[data-v="128"] { background: #0277bd; box-shadow: 0 0 10px #0277bd; }
+        .tile[data-v="256"] { background: #01579b; }
+        .tile[data-v="512"] { background: #1a237e; }
+        .tile[data-v="1024"] { background: #311b92; }
+        .tile[data-v="2048"] { background: #4a148c; animation: pulse 1.5s infinite; }
+        
+        @keyframes pop { 0%{transform:scale(0)} 70%{transform:scale(1.15)} 100%{transform:scale(1)} }
+        @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(74,20,140,0.7)} 70%{box-shadow:0 0 0 10px transparent} 100%{box-shadow:0 0 0 0 transparent} }
+        .tile.new { animation: pop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) backwards; }
+        .tile.merged { animation: pop 0.2s ease-in-out; }
+
+        /* 2. Puzzle (Upload & Slide) */
+        #puz-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+        .puz-board { position: relative; width: 306px; height: 306px; background: #fff; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .puz-piece {
+            position: absolute; width: 100px; height: 100px;
+            background-size: 300px 300px; border-radius: 6px;
+            transition: top 0.2s ease, left 0.2s ease;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5); cursor: pointer;
+        }
+        .file-wrap { position: relative; overflow: hidden; }
+        .file-wrap input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+        /* 3. Match (Feedback) */
+        #match-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; max-width: 360px; aspect-ratio: 1; }
+        .m-card {
+            background: #fff; border-radius: 12px; position: relative;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.1rem; color: var(--primary); font-weight: bold; font-family: var(--font-num);
+            box-shadow: 0 4px 0 #b0bec5; cursor: pointer; transition: transform 0.1s;
+        }
+        .m-card:active { transform: translateY(4px); box-shadow: none; }
+        .m-cover {
+            position: absolute; inset: 0; background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+            display: flex; justify-content: center; align-items: center; color: white;
+            font-size: 1.5rem; border-radius: 12px; transition: opacity 0.2s;
+        }
+        .m-card.open .m-cover { opacity: 0; pointer-events: none; }
+        .m-card.ok { background: var(--success) !important; color: white; animation: pulseGreen 0.5s; box-shadow: none; }
+        .m-card.err { animation: shake 0.4s; background: var(--error); color: white; }
+        .m-card.gone { opacity: 0; pointer-events: none; transition: opacity 0.5s; }
+        @keyframes pulseGreen { 0%{transform:scale(1)} 50%{transform:scale(1.1)} 100%{transform:scale(1)} }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+
+        /* 4. Minesweeper (Square) */
+        #mine-grid {
+            display: grid; gap: 2px; padding: 4px; background: #b0bec5; border-radius: 8px;
+            width: fit-content; max-width: 100%; margin: 0 auto;
+        }
+        .mine-cell {
+            width: 34px; height: 34px; background: #eceff1; border-radius: 2px;
+            display: flex; justify-content: center; align-items: center;
+            font-weight: bold; font-family: var(--font-num); font-size: 1.1rem; cursor: pointer;
+        }
+        @media (max-width: 600px) {
+            #mine-grid { width: 100%; }
+            .mine-cell { width: auto; height: auto; aspect-ratio: 1; font-size: 0.8rem; }
+        }
+        .mine-cell.open { background: #fff; }
+        .mine-cell.flag { background: #fff9c4; }
+        .mine-cell.bomb { background: var(--error); color: white; }
+        .n1{color:#1976d2}.n2{color:#388e3c}.n3{color:#d32f2f}.n4{color:#7b1fa2}
+
+        /* 5. Tetris (Big Grey-Blue UI) */
+        #tetris-ui { display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%; }
+        canvas#t-c { background: rgba(38, 50, 56, 0.95); border-radius: 4px; border: 4px solid #cfd8dc; height: 50vh; width: auto; aspect-ratio: 1/2; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .gb-pad {
+            margin-top: 15px; width: 100%; max-width: 380px; background: rgba(255,255,255,0.7);
+            padding: 20px; border-radius: 30px; display: flex; justify-content: space-around; align-items: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05); flex: 1;
+        }
+        .dpad { position: relative; width: 150px; height: 150px; }
+        .dp { position: absolute; background: #90a4ae; border-radius: 8px; box-shadow: 0 5px 0 #546e7a; cursor: pointer; }
+        .dp:active { transform: translateY(5px); box-shadow: none; background: #78909c; }
+        .du{top:0;left:50px;width:50px;height:50px} .dd{bottom:0;left:50px;width:50px;height:50px}
+        .dl{top:50px;left:0;width:50px;height:50px} .dr{top:50px;right:0;width:50px;height:50px}
+        .acts { display: flex; gap: 20px; }
+        .ab { width: 75px; height: 75px; border-radius: 50%; border: none; color: white; font-weight: bold; font-size: 1.4rem; box-shadow: 0 5px 0 rgba(0,0,0,0.2); cursor: pointer; }
+        .ab:active { transform: translateY(5px); box-shadow: none; }
+        .btn-a { background: #78909c; } .btn-b { background: #5c6bc0; } /* Grey-Blue tone */
+
+        /* 6. Chain Sums (UI & SVG) */
+        #chain-b { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2%; padding: 10px; background: rgba(255,255,255,0.6); border-radius: 16px; position: relative; }
+        #chain-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+        .chain-path { fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; opacity: 0.6; transition: stroke 0.3s; }
+        .chain-path.ok { stroke: var(--success); }
+        .c-cell { background: #fff; border-radius: 50%; width: 100%; aspect-ratio: 1; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 1.4rem; color: var(--primary); box-shadow: 0 3px 6px rgba(0,0,0,0.1); position: relative; z-index: 10; transition: transform 0.1s; }
+        .c-cell.on { background: var(--accent); color: white; transform: scale(1.15); }
+        .c-cell.ok { background: var(--success); color: white; }
+        .chain-hud { display: flex; justify-content: space-between; width: 100%; padding: 0 10px; font-weight: bold; color: var(--primary); font-family: var(--font-num); font-size: 1.1rem; margin-bottom: 10px; }
+        .hud-val { color: var(--accent); font-size: 1.3rem; }
+
+        /* 7. Twenty & Sudoku */
+        .grid-std { display: grid; gap: 4px; padding: 8px; background: #b0bec5; border-radius: 12px; width: 100%; aspect-ratio: 1; max-width: 360px; }
+        .std-c { background: #fff; border-radius: 4px; display: flex; justify-content: center; align-items: center; font-size: 1.3rem; font-weight: bold; color: var(--primary); font-family: var(--font-num); cursor: pointer; }
+        .std-c.on { background: var(--accent); color: #fff; }
+
+        /* Overlays */
+        #modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 200; display: none; justify-content: center; align-items: center; }
+        .modal-box { background: #fff; padding: 25px; border-radius: 20px; width: 85%; max-width: 350px; animation: pop 0.3s; }
+        #cheer-layer { position: fixed; bottom: 80px; right: 10px; z-index: 150; pointer-events: none; display: flex; flex-direction: column; align-items: flex-end; }
+        .bub { background: #fff; padding: 10px 15px; border-radius: 20px 20px 4px 20px; margin-top: 10px; display: flex; gap: 10px; align-items: center; box-shadow: 0 5px 20px rgba(0,0,0,0.15); opacity: 0; transform: translateY(20px); transition: 0.4s; }
+        .bub.show { opacity: 1; transform: translateY(0); }
+        .b-pic { width: 45px; height: 45px; border-radius: 50%; border: 2px solid #fff; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body onclick="App.initAudio()">
+
+<audio id="bgm" loop><source src="https://file.garden/aWe99vhwaGcNwkok/%E6%B6%88%E6%B6%88%E6%A8%82/Little%20break%20by%20Chillpeach.mp3" type="audio/mpeg"></audio>
+<audio id="sfx-merge" src="https://file.garden/aWe99vhwaGcNwkok/%E6%B6%88%E6%B6%88%E6%A8%82/%E6%B1%BA%E5%AE%9A%E3%83%9C%E3%82%BF%E3%83%B3%E3%82%92%E6%8A%BC%E3%81%9942.mp3"></audio>
+<audio id="sfx-win" src="https://file.garden/aWe99vhwaGcNwkok/%E6%B6%88%E6%B6%88%E6%A8%82/%E6%B1%BA%E5%AE%9A%E3%83%9C%E3%82%BF%E3%83%B3%E3%82%92%E6%8A%BC%E3%81%9929.mp3"></audio>
+<audio id="sfx-boom" src="https://file.garden/aWe99vhwaGcNwkok/%E6%B6%88%E6%B6%88%E6%A8%82/%E6%B1%BA%E5%AE%9A%E3%83%9C%E3%82%BF%E3%83%B3%E3%82%92%E6%8A%BC%E3%81%9915.mp3"></audio>
+<audio id="sfx-btn" src="https://file.garden/aWe99vhwaGcNwkok/%E5%8F%A4%E5%A0%A1/bgm/SXF/%E9%BB%9E%E6%93%8A%E7%95%AB%E9%9D%A2%E9%9F%B3%E6%95%88"></audio>
+<audio id="sfx-click" src="https://file.garden/aWe99vhwaGcNwkok/%E7%B2%BE%E7%A5%9E%E7%97%85%E9%99%A2/BGM/%E9%BB%9E%E6%93%8A%E5%B0%8D%E8%A9%B1.mp3"></audio>
+<audio id="sfx-flip" src="https://file.garden/aWe99vhwaGcNwkok/%E6%B6%88%E6%B6%88%E6%A8%82/%E6%B1%BA%E5%AE%9A%E3%83%9C%E3%82%BF%E3%83%B3%E3%82%92%E6%8A%BC%E3%81%9942.mp3"></audio>
+<audio id="sfx-err" src="https://file.garden/aWe99vhwaGcNwkok/%E6%B6%88%E6%B6%88%E6%A8%82/%E6%B1%BA%E5%AE%9A%E3%83%9C%E3%82%BF%E3%83%B3%E3%82%92%E6%8A%BC%E3%81%9939.mp3"></audio>
+
+<header class="glass-panel">
+    <img src="https://file.garden/aWe99vhwaGcNwkok/%E7%A0%B4%E9%A0%AD/%E5%A5%A7%E6%8B%89.png" class="avatar">
+    <div class="info">
+        <div class="dialogue" id="ora">準備好開始了嗎？</div>
+        <div class="score" id="score">SCORE: 0</div>
+    </div>
+    <button class="btn" onclick="App.toggleBgm()" style="padding:5px 10px; border-radius:50%; width:40px; height:40px;">🎵</button>
+</header>
+
+<main>
+    <div id="v-menu" class="view active">
+        <div class="menu-grid">
+            <div class="card glass-panel" onclick="App.playSfx('btn');App.go('mine')"><div class="c-icon">💣</div><div class="c-title">踩地雷</div><div class="c-desc">長按插旗．推理</div></div>
+            <div class="card glass-panel" onclick="App.playSfx('btn');App.go('2048')"><div class="c-icon">❄️</div><div class="c-title">2048</div><div class="c-desc">極光色系．動效</div></div>
+            <div class="card glass-panel" onclick="App.playSfx('btn');App.go('puzzle')"><div class="c-icon">🧩</div><div class="c-title">拼圖</div><div class="c-desc">自訂圖片．滑動</div></div>
+            <div class="card glass-panel" onclick="App.playSfx('btn');App.go('match')"><div class="c-icon">🧠</div><div class="c-title">記憶翻牌</div><div class="c-desc">綠色反饋．震動</div></div>
+            <div class="card glass-panel" onclick="App.playSfx('btn');App.go('chain')"><div class="c-icon">🔗</div><div class="c-title">連連看</div><div class="c-desc">儀表板．成功特效</div></div>
+            <div class="card glass-panel" onclick="App.playSfx('btn');App.go('tetris')"><div class="c-icon">🧱</div><div class="c-title">幾何特訓</div><div class="c-desc">大按鈕．掌機版</div></div>
+            <div class="card glass-panel" onclick="App.playSfx('btn');App.go('twenty')"><div class="c-icon">🔢</div><div class="c-title">Twenty</div><div class="c-desc">數字堆疊．漸層</div></div>
+            <div class="card glass-panel" onclick="App.playSfx('btn');App.go('sudoku')"><div class="c-icon">✏️</div><div class="c-title">數獨</div><div class="c-desc">邏輯填空．經典</div></div>
+        </div>
+    </div>
+
+    <div id="v-game" class="view">
+        <div class="toolbar">
+            <button class="btn" onclick="App.playSfx('btn');App.help()">?</button>
+            <div id="tools" style="display:flex;gap:5px"></div>
+        </div>
+        <div id="stage" class="stage"></div>
+        <div class="controls">
+            <button class="btn" onclick="App.playSfx('btn');App.back()">退出</button>
+            <button class="btn active hidden" id="chk" onclick="App.playSfx('btn');App.chk()">交卷</button>
+        </div>
+    </div>
+</main>
+
+<div id="modal" onclick="this.style.display='none'">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <h3 id="mh" style="margin-top:0;color:var(--primary)"></h3>
+        <p id="mb" style="color:#78909c"></p>
+        <button class="btn active" style="width:100%" onclick="document.getElementById('modal').style.display='none'">知道了</button>
+    </div>
+</div>
+<div id="cheer-layer"></div>
+
+<script>
+// --- DB ---
+const DB={ora:["數學是宇宙的語言。","冷靜思考。","保持優雅。","看準再下手。","不要猶豫。","邏輯清晰。","這步不錯。","專心。"],st:[{n:"蘭蘭",i:"https://file.garden/aWe99vhwaGcNwkok/%E7%A0%B4%E9%A0%AD/%E8%98%AD%E8%98%AD.png",t:["太強了！","亮晶晶的！","好厲害！"]},{n:"喬諾娜",i:"https://file.garden/aWe99vhwaGcNwkok/%E7%A0%B4%E9%A0%AD/%E5%96%AC%E8%AB%BE%E5%A8%9C.png",t:["真優雅～","慢慢來。","吃顆糖嗎？"]},{n:"諾維安",i:"https://file.garden/aWe99vhwaGcNwkok/%E7%A0%B4%E9%A0%AD/%E8%AB%BE%E7%B6%AD%E5%AE%89.png",t:["全速前進！","大浪來啦！","方向正確！"]},{n:"安德烈",i:"https://file.garden/aWe99vhwaGcNwkok/%E7%A0%B4%E9%A0%AD/%E5%AE%89%E5%BE%B7%E7%83%88.png",t:["運算無誤。","邏輯正確。","結構穩固。"]},{n:"阿朵菈",i:"https://file.garden/aWe99vhwaGcNwkok/%E7%A0%B4%E9%A0%AD/%E9%98%BF%E6%9C%B5%E6%8B%89.png",t:["好可愛！","像人偶一樣！","太棒了！"]},{n:"蜜拉思",i:"https://file.garden/aWe99vhwaGcNwkok/%E7%A0%B4%E9%A0%AD/%E8%9C%9C%E6%8B%89%E6%80%9D.png",t:["呵呵...","有趣。","這招不錯。"]},{n:"海神",i:"https://file.garden/aWe99vhwaGcNwkok/%E7%A0%B4%E9%A0%AD/%E6%B5%B7%E7%A5%9E.png",t:["太酷了！","天天開心！","好玩！"]},{n:"小目",i:"https://file.garden/aWe99vhwaGcNwkok/%E7%A0%B4%E9%A0%AD/%E5%B0%8F%E7%9B%AE.png",t:["總裁級操作！","為了芒果！","閃亮得分！"]},{n:"卡洛特",i:"https://file.garden/aWe99vhwaGcNwkok/%E7%A0%B4%E9%A0%AD/%E5%8D%A1%E6%B4%9B%E7%89%B9.png",t:["很友善！","直覺是對的。","蘿蔔喜歡。"]},{n:"蘇郎",i:"https://file.garden/aWe99vhwaGcNwkok/%E7%A0%B4%E9%A0%AD/%E8%98%87%E9%83%8E.png",t:["有趣有趣。","大膽一點！","比看戲好玩。"]}]};
+
+// --- Core ---
+const App={
+    m:null, s:0, bgmOn:false,
+    initAudio:()=>{
+        document.body.removeAttribute('onclick');
+        App.toggleBgm();
+    },
+    toggleBgm:()=>{
+        let b=document.getElementById('bgm');
+        if(App.bgmOn){b.pause();App.bgmOn=false;}
+        else{b.volume=0.3;b.play().catch(()=>{});App.bgmOn=true;}
+    },
+    playSfx:(id)=>{
+        let s=document.getElementById('sfx-'+id);
+        if(s){s.currentTime=0;s.play().catch(()=>{});}
+    },
+    go:(k)=>{
+        App.m=k; App.s=0; document.getElementById('score').innerText="SCORE: 0";
+        document.getElementById('v-menu').classList.remove('active');
+        document.getElementById('v-game').classList.add('active');
+        document.getElementById('stage').innerHTML='';
+        document.getElementById('tools').innerHTML='';
+        document.getElementById('chk').classList.add('hidden');
+        App.ora("課程開始。");
+        if(k=='2048') G2048.i(); if(k=='mine') Mine.i(); if(k=='match') Match.i();
+        if(k=='chain') Chain.i(); if(k=='tetris') Tetris.i(); if(k=='twenty') Twenty.i();
+        if(k=='puzzle') Puzzle.i(); if(k=='sudoku') Sudoku.i();
+    },
+    back:()=>{
+        if(App.m=='tetris') Tetris.stop();
+        document.getElementById('v-game').classList.remove('active');
+        document.getElementById('v-menu').classList.add('active');
+        App.ora("下課休息。"); App.m=null;
+    },
+    ora:(t)=>{ let e=document.getElementById('ora'); e.style.opacity=0; setTimeout(()=>{e.innerText=t;e.style.opacity=1},200); },
+    cheer:()=>{
+        if(Math.random()>0.4)return; // Higher chance
+        let s=DB.st[Math.floor(Math.random()*DB.st.length)], t=s.t[Math.floor(Math.random()*s.t.length)];
+        let d=document.createElement('div'); d.className='bub'; d.innerHTML=`<img src="${s.i}" class="b-pic"><span>${t}</span>`;
+        document.getElementById('cheer-layer').appendChild(d);
+        requestAnimationFrame(()=>d.classList.add('show'));
+        setTimeout(()=>{d.style.opacity=0;setTimeout(()=>d.remove(),500)},2000);
+        if(Math.random()>0.7) App.ora(DB.ora[Math.floor(Math.random()*DB.ora.length)]);
+    },
+    help:()=>{
+        let h={mine:"長按(0.4秒)插旗，短按挖掘。",match:"找出算式與答案的配對。",chain:"滑動連線，使總和等於目標。",2048:"滑動合併相同數字。",tetris:"填滿橫排消除。",twenty:"點擊合併相同數字。",puzzle:"滑動還原圖片。",sudoku:"填入1-9不重複。"};
+        document.getElementById('mh').innerText="說明"; document.getElementById('mb').innerText=h[App.m];
+        document.getElementById('modal').style.display='flex';
+    },
+    chk:()=>{if(App.m=='sudoku')Sudoku.chk()}
+};
+
+// --- 1. 2048 (Colors Fix) ---
+const G2048={
+    g:[],
+    i:()=>{
+        document.getElementById('stage').innerHTML=`<div id="g2048" class="board-sq"></div>`;
+        let w=document.getElementById('g2048');
+        for(let i=0;i<16;i++){let d=document.createElement('div');d.className='g2048-cell';d.style.top=(2+Math.floor(i/4)*24.5)+'%';d.style.left=(2+(i%4)*24.5)+'%';w.appendChild(d)}
+        G2048.g=Array(4).fill().map(()=>Array(4).fill(null)); G2048.sp();G2048.sp();
+        let sx,sy; w.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;e.preventDefault()},{passive:false});
+        w.addEventListener('touchend',e=>{let dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;if(Math.abs(dx)>Math.abs(dy)){if(Math.abs(dx)>30)G2048.mv(dx>0?2:0)}else{if(Math.abs(dy)>30)G2048.mv(dy>0?3:1)}});
+    },
+    sp:()=>{
+        let e=[];for(let r=0;r<4;r++)for(let c=0;c<4;c++)if(!G2048.g[r][c])e.push({r,c});
+        if(e.length){let p=e[Math.floor(Math.random()*e.length)],v=Math.random()>.9?4:2,id=Math.random().toString(36).substr(2,9);G2048.g[p.r][p.c]={v,id};G2048.dr(p.r,p.c,v,id,1)}
+    },
+    dr:(r,c,v,id,n)=>{
+        let d=document.createElement('div'); d.className='tile'; d.setAttribute('data-v',v); d.innerText=v; d.id='t'+id;
+        if(n)d.classList.add('new');
+        d.style.top=(2+r*24.5)+'%'; d.style.left=(2+c*24.5)+'%';
+        document.getElementById('g2048').appendChild(d);
+    },
+    mv:(d)=>{
+        let g=G2048.g, rt=m=>m[0].map((_,i)=>m.map(r=>r[i]).reverse()), rts=[0,3,2,1][d];
+        for(let i=0;i<rts;i++)g=rt(g);
+        let mv=false, sc=0, rm=[];
+        for(let r=0;r<4;r++){
+            let rw=g[r].filter(x=>x), nw=[], sk=false;
+            for(let i=0;i<rw.length;i++){
+                if(sk){sk=false;continue}
+                if(i<rw.length-1&&rw[i].v==rw[i+1].v){
+                    rw[i].v*=2; sc+=rw[i].v; rm.push(rw[i+1].id); nw.push(rw[i]); sk=true; mv=true;
+                }else nw.push(rw[i]);
+            }
+            while(nw.length<4)nw.push(null);
+            if(g[r].map(x=>x?x.id:'').join()!=nw.map(x=>x?x.id:'').join())mv=true;
+            g[r]=nw;
+        }
+        for(let i=0;i<(4-rts)%4;i++)g=rt(g); G2048.g=g;
+        if(mv){
+            App.score+=sc; document.getElementById('score').innerText="SCORE: "+App.score; if(sc>0){App.cheer();App.playSfx('merge');}
+            rm.forEach(id=>{let e=document.getElementById('t'+id);if(e)e.remove()});
+            for(let r=0;r<4;r++)for(let c=0;c<4;c++){
+                let cell=g[r][c]; if(cell){
+                    let el=document.getElementById('t'+cell.id);
+                    if(el){
+                        el.style.top=(2+r*24.5)+'%'; el.style.left=(2+c*24.5)+'%';
+                        if(el.innerText!=cell.v){ el.setAttribute('data-v',cell.v); el.innerText=cell.v; el.classList.remove('new'); void el.offsetWidth; el.classList.add('merged'); }
+                    }
+                }
+            }
+            setTimeout(G2048.sp,150);
+        }
+    }
+};
+
+// --- 2. Minesweeper (Vibrate) ---
+const Mine={
+    r:9,c:9,m:10,g:[],first:true,
+    i:()=>{document.getElementById('tools').innerHTML=`<button class="btn" onclick="App.playSfx('btn');Mine.st(9,9,10)">簡</button><button class="btn" onclick="App.playSfx('btn');Mine.st(12,12,20)">中</button><button class="btn" onclick="App.playSfx('btn');Mine.st(16,16,40)">難</button><button class="btn" onclick="App.playSfx('btn');Mine.st(20,20,60)">專</button>`;Mine.st(9,9,10)},
+    st:(r,c,m)=>{
+        Mine.r=r;Mine.c=c;Mine.m=m;
+        document.getElementById('stage').innerHTML=`<div id="mine-grid" style="grid-template-columns:repeat(${c},1fr)"></div>`;
+        let b=document.getElementById('mine-grid');
+        Mine.g=Array(r*c).fill(0).map((_,i)=>({i,v:0,s:0})); Mine.first=true;
+        Mine.g.forEach((x,i)=>{
+            let d=document.createElement('div');d.className='mine-cell';d.id=`mc${i}`;
+            let t;
+            const start=(e)=>{if(e.type=='touchstart')e.preventDefault();t=setTimeout(()=>Mine.fg(i),400)};
+            const end=()=>{clearTimeout(t)};
+            d.addEventListener('mousedown',start); d.addEventListener('touchstart',start,{passive:false});
+            d.addEventListener('mouseup',end); d.addEventListener('touchend',e=>{end();if(!Mine.lg)Mine.dg(i);Mine.lg=false;if(e.cancelable)e.preventDefault()});
+            d.addEventListener('click',()=>Mine.dg(i));
+            b.appendChild(d);
+        });
+    },
+    fg:(i)=>{Mine.lg=true;let c=Mine.g[i];if(c.s==1)return;c.s=c.s==2?0:2;let d=document.getElementById(`mc${i}`);d.classList.toggle('flag');d.innerText=c.s==2?'🚩':'';if(navigator.vibrate)navigator.vibrate(50);App.playSfx('click')},
+    dg:(i)=>{
+        if(Mine.g[i].s!=0)return;
+        App.playSfx('click');
+        if(Mine.first){Mine.pl(i);Mine.first=false}
+        if(Mine.g[i].v==-1){document.getElementById(`mc${i}`).classList.add('bomb');document.getElementById(`mc${i}`).innerText='💣';App.playSfx('boom');alert('爆炸！');Mine.sa()}
+        else{Mine.rv(i);if(Mine.g.filter(x=>x.v!=-1&&x.s==0).length==0){App.score+=500;App.cheer();App.playSfx('win');alert("成功！")}}
+    },
+    pl:(ex)=>{
+        let p=Mine.g.map(x=>x.i).filter(x=>x!=ex); for(let k=0;k<Mine.m;k++)Mine.g[p.splice(Math.floor(Math.random()*p.length),1)[0]].v=-1;
+        Mine.g.forEach(c=>{if(c.v!=-1)c.v=Mine.gn(c.i).filter(n=>Mine.g[n].v==-1).length});
+    },
+    gn:(i)=>{let n=[],r=Math.floor(i/Mine.c),c=i%Mine.c;for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)if(x||y){let nr=r+x,nc=c+y;if(nr>=0&&nr<Mine.r&&nc>=0&&nc<Mine.c)n.push(nr*Mine.c+nc)}return n},
+    rv:(i)=>{let c=Mine.g[i];if(c.s!=0)return;c.s=1;let d=document.getElementById(`mc${i}`);d.classList.add('open');if(c.v>0){d.innerText=c.v;d.classList.add(`n${c.v}`)}else Mine.gn(i).forEach(n=>Mine.rv(n));},
+    sa:()=>{Mine.g.forEach(c=>{if(c.v==-1){let d=document.getElementById(`mc${c.i}`);d.classList.add('bomb');d.innerText='💣'}})}
+};
+
+// --- 3. Match (Values Fix) ---
+const Match={
+    c:[], f:[], l:1,
+    i:()=>{document.getElementById('tools').innerHTML=`<button class="btn" onclick="App.playSfx('btn');Match.st(1)">簡</button><button class="btn" onclick="App.playSfx('btn');Match.st(2)">中</button><button class="btn" onclick="App.playSfx('btn');Match.st(3)">難</button>`;Match.st(1)},
+    st:(l)=>{
+        Match.l=l; document.getElementById('stage').innerHTML=`<div id="match-grid"></div>`;
+        let box=document.getElementById('match-grid'), p=[];
+        for(let i=0;i<8;i++){
+            let q,a,v;
+            if(l==1){let x=Math.ceil(Math.random()*9),y=Math.ceil(Math.random()*9);v=x+y;q=`${x}+${y}`;a=v}
+            else if(l==2){let x=Math.floor(Math.random()*200),y=Math.floor(Math.random()*100);v=x+y;q=`${x}+${y}`;a=v}
+            else{let x=Math.ceil(Math.random()*12)+2,y=Math.ceil(Math.random()*12);v=x*y;q=`${x}×${y}`;a=v}
+            p.push({t:q,v:v,id:i},{t:a,v:v,id:i});
+        }
+        Match.c=p.sort(()=>Math.random()-.5).map(x=>({...x,s:0}));
+        Match.c.forEach((c,i)=>{
+            let d=document.createElement('div');d.className='m-card';d.innerHTML=`<span>${c.t}</span><div class="m-cover">?</div>`;d.onclick=()=>Match.ck(i,d);box.appendChild(d);
+        });
+        Match.f=[];
+    },
+    ck:(i,el)=>{
+        if(Match.c[i].s!=0 || Match.f.length>=2)return;
+        App.playSfx('flip');
+        el.classList.add('open'); Match.c[i].s=1; Match.f.push({i,el});
+        if(Match.f.length==2){
+            let [a,b]=Match.f;
+            if(Match.c[a.i].v == Match.c[b.i].v){
+                setTimeout(()=>{
+                    a.el.classList.add('ok'); b.el.classList.add('ok');
+                    App.score+=100; document.getElementById('score').innerText="SCORE: "+App.score; App.cheer(); App.playSfx('merge');
+                    setTimeout(()=>{a.el.classList.add('gone');b.el.classList.add('gone');},600);
+                },300);
+            }else{
+                setTimeout(()=>{App.playSfx('err');a.el.classList.add('err');b.el.classList.add('err');setTimeout(()=>{a.el.classList.remove('open','err');b.el.classList.remove('open','err');Match.c[a.i].s=0;Match.c[b.i].s=0},500)},500);
+            }
+            Match.f=[];
+        }
+    }
+};
+
+// --- 4. Chain (HUD + Touch Fix) ---
+const Chain={
+    g:[],p:[],t:10,act:false,
+    i:()=>{
+        document.getElementById('stage').innerHTML=`<div class="chain-hud"><div>目前: <span id="c-cur" class="hud-val">0</span></div><div>目標: <span id="c-tg" class="hud-val">10</span></div></div><div id="chain-b" class="board-sq" style="background:rgba(255,255,255,0.6); display:grid; grid-template-columns:repeat(5,1fr); gap:2%; padding:10px;"><svg id="chain-svg"><path id="cl" class="chain-path" d=""/></svg></div>`;
+        Chain.ng();
+        let b=document.getElementById('chain-b');
+        let mv=(e)=>{
+            if(!Chain.act)return; e.preventDefault();
+            let t=e.touches?e.touches[0]:e, r=b.getBoundingClientRect();
+            Chain.dr(t.clientX,t.clientY);
+            let el=document.elementFromPoint(t.clientX,t.clientY);
+            if(el&&el.dataset.i)Chain.ad(parseInt(el.dataset.i));
+        };
+        let ed=()=>{if(Chain.act)Chain.ck();Chain.act=false;Chain.p=[];Chain.dr();document.getElementById('c-cur').innerText=0};
+        b.addEventListener('mousedown',e=>{Chain.act=true;if(e.target.dataset.i)Chain.ad(parseInt(e.target.dataset.i))});
+        document.addEventListener('mousemove',mv); document.addEventListener('mouseup',ed);
+        b.addEventListener('touchstart',e=>{Chain.act=true;if(e.target.dataset.i)Chain.ad(parseInt(e.target.dataset.i))},{passive:false});
+        document.addEventListener('touchmove',mv,{passive:false}); document.addEventListener('touchend',ed);
+    },
+    ng:()=>{
+        Chain.t=Math.floor(Math.random()*5)+8; document.getElementById('c-tg').innerText=Chain.t;
+        Chain.g=Array(25).fill(0).map(()=>Math.ceil(Math.random()*6));
+        let b=document.getElementById('chain-b'); [...b.children].forEach(c=>{if(c.tagName!='svg')c.remove()});
+        Chain.g.forEach((v,i)=>{let d=document.createElement('div');d.className='c-cell';d.innerText=v;d.dataset.i=i;b.appendChild(d)});
+    },
+    ad:(i)=>{
+        if(isNaN(i))return;
+        App.playSfx('click');
+        if(Chain.p.includes(i)){if(Chain.p.length>1&&Chain.p[Chain.p.length-2]==i)Chain.p.pop()}
+        else{if(Chain.p.length==0)Chain.p.push(i);else{let l=Chain.p[Chain.p.length-1],r1=Math.floor(l/5),c1=l%5,r2=Math.floor(i/5),c2=i%5;if(Math.abs(r1-r2)<=1&&Math.abs(c1-c2)<=1)Chain.p.push(i)}}
+        document.querySelectorAll('.c-cell').forEach((e,x)=>e.classList.toggle('on',Chain.p.includes(x)));
+        let sum=Chain.p.reduce((a,b)=>a+Chain.g[b],0); document.getElementById('c-cur').innerText=sum;
+        if(sum==Chain.t) document.getElementById('c-cur').style.color='var(--success)';
+        else if(sum>Chain.t) document.getElementById('c-cur').style.color='var(--error)';
+        else document.getElementById('c-cur').style.color='var(--accent)';
+    },
+    dr:(mx,my)=>{
+        if(Chain.p.length==0){document.getElementById('cl').setAttribute('d','');return}
+        let r=document.getElementById('chain-b').getBoundingClientRect(), p="";
+        Chain.p.forEach((idx,i)=>{
+            let el=document.querySelectorAll('.c-cell')[idx], er=el.getBoundingClientRect();
+            let x=er.left-r.left+er.width/2, y=er.top-r.top+er.height/2;
+            p+=(i==0?`M ${x} ${y}`:` L ${x} ${y}`);
+        });
+        if(mx) p+=` L ${mx-r.left} ${my-r.top}`;
+        document.getElementById('cl').setAttribute('d',p);
+    },
+    ck:()=>{
+        let sum=Chain.p.reduce((a,b)=>a+Chain.g[b],0), path=document.getElementById('cl');
+        if(sum==Chain.t && Chain.p.length>1){
+            App.score+=Chain.t*10; document.getElementById('score').innerText="SCORE: "+App.score;
+            path.classList.add('ok'); Chain.p.forEach(i=>document.querySelectorAll('.c-cell')[i].classList.add('ok'));
+            App.cheer(); App.playSfx('merge'); setTimeout(()=>{path.classList.remove('ok');Chain.ng()},500);
+        } else { document.querySelectorAll('.c-cell').forEach(e=>e.classList.remove('on')); path.setAttribute('d',''); }
+    }
+};
+
+// --- 5. Puzzle ---
+const Puzzle={
+    g:[], img:null,
+    i:()=>{document.getElementById('stage').innerHTML=`<div id="puz-stage"><div class="file-wrap btn">上傳圖片<input type="file" onchange="Puzzle.file(this)"></div><div class="puz-board" id="pb"></div><button class="btn" onclick="App.playSfx('btn');Puzzle.load()">隨機角色</button></div><canvas id="pc" width="300" height="300" style="display:none"></canvas>`;Puzzle.load()},
+    load:()=>{let s=DB.st[Math.floor(Math.random()*DB.st.length)];let i=new Image();i.crossOrigin="Anonymous";i.onload=()=>{let c=document.getElementById('pc'),x=c.getContext('2d'),m=Math.min(i.width,i.height);x.drawImage(i,(i.width-m)/2,(i.height-m)/2,m,m,0,0,300,300);Puzzle.img=c.toDataURL();Puzzle.st()};i.src=s.i},
+    file:(e)=>{let f=e.files[0],r=new FileReader();r.onload=ev=>{let i=new Image();i.onload=()=>{let c=document.getElementById('pc'),x=c.getContext('2d'),m=Math.min(i.width,i.height);x.drawImage(i,(i.width-m)/2,(i.height-m)/2,m,m,0,0,300,300);Puzzle.img=c.toDataURL();Puzzle.st()};i.src=ev.target.result};r.readAsDataURL(f)},
+    st:()=>{
+        Puzzle.g=[0,1,2,3,4,5,6,7,8];
+        for(let k=0;k<150;k++){
+            let z=Puzzle.g.indexOf(8), r=Math.floor(z/3), c=z%3, m=[];
+            if(r>0)m.push(z-3); if(r<2)m.push(z+3); if(c>0)m.push(z-1); if(c<2)m.push(z+1);
+            let t=m[Math.floor(Math.random()*m.length)]; [Puzzle.g[z],Puzzle.g[t]]=[Puzzle.g[t],Puzzle.g[z]];
+        }
+        Puzzle.dr();
+    },
+    dr:()=>{
+        let b=document.getElementById('pb'); b.innerHTML='';
+        Puzzle.g.forEach((v,i)=>{
+            if(v==8)return;
+            let d=document.createElement('div'); d.className='puz-piece';
+            d.style.backgroundImage=`url(${Puzzle.img})`;
+            d.style.backgroundPosition=`-${(v%3)*100}px -${Math.floor(v/3)*100}px`;
+            d.style.left=(i%3)*102+'px'; d.style.top=Math.floor(i/3)*102+'px';
+            d.onclick=()=>Puzzle.mv(i); b.appendChild(d);
+        });
+    },
+    mv:(i)=>{
+        let z=Puzzle.g.indexOf(8), r1=Math.floor(i/3),c1=i%3, r2=Math.floor(z/3),c2=z%3;
+        if(Math.abs(r1-r2)+Math.abs(c1-c2)==1){
+            App.playSfx('click');
+            [Puzzle.g[i],Puzzle.g[z]]=[Puzzle.g[z],Puzzle.g[i]]; Puzzle.dr();
+            if(Puzzle.g.every((v,k)=>v==k)){ App.cheer(); App.playSfx('win'); setTimeout(()=>alert("拼圖完成！"),200); }
+        }
+    }
+};
+
+// --- 6. Tetris (Blue/Grey) ---
+const Tetris={
+    t:null,ctx:null,b:[],c:null,col:[null,'#90caf9','#80deea','#a5d6a7','#fff59d','#ffcc80','#b0bec5','#9fa8da'],
+    i:()=>{document.getElementById('stage').innerHTML=`<div id="tetris-ui"><canvas id="t-c" width="200" height="400"></canvas><div class="gb-pad"><div class="dpad"><div class="dp du" ontouchstart="Tetris.rot()"></div><div class="dp dl" ontouchstart="Tetris.mv(-1,0,1)"></div><div class="dp dr" ontouchstart="Tetris.mv(1,0,1)"></div><div class="dp dd" ontouchstart="Tetris.mv(0,1,1)"></div></div><div class="acts"><button class="ab btn-a" ontouchstart="Tetris.dp()">A</button><button class="ab btn-b" ontouchstart="Tetris.rot()">B</button></div></div></div>`;Tetris.ctx=document.getElementById('t-c').getContext('2d');Tetris.b=Array(20).fill().map(()=>Array(10).fill(0));Tetris.sp();Tetris.t=setInterval(Tetris.tk,800);Tetris.dr()},
+    stop:()=>{clearInterval(Tetris.t)},
+    sp:()=>{let s=[[[1,1,1,1]],[[2,0,0],[2,2,2]],[[0,0,3],[3,3,3]],[[4,4],[4,4]],[[0,5,5],[5,5,0]],[[0,6,0],[6,6,6]],[[7,7,0],[0,7,7]]],r=Math.floor(Math.random()*7);Tetris.c={s:s[r],t:r+1,x:3,y:0};if(Tetris.h(0,0)){clearInterval(Tetris.t);alert("下課")}},
+    h:(dx,dy,s=Tetris.c.s,x=Tetris.c.x,y=Tetris.c.y)=>{for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)if(s[r][c]&&(x+c+dx<0||x+c+dx>=10||y+r+dy>=20||(y+r+dy>=0&&Tetris.b[y+r+dy][x+c+dx])))return true;return false},
+    mv:(dx,dy,u)=>{if(!Tetris.h(dx,dy)){Tetris.c.x+=dx;Tetris.c.y+=dy;Tetris.dr();if(u)App.playSfx('click');return true}return false},
+    rot:()=>{let s=Tetris.c.s[0].map((_,i)=>Tetris.c.s.map(r=>r[i]).reverse());if(!Tetris.h(0,0,s))Tetris.c.s=s;Tetris.dr();App.playSfx('flip')},
+    tk:()=>{if(!Tetris.mv(0,1))Tetris.lk()},
+    dp:()=>{while(Tetris.mv(0,1));Tetris.lk();App.playSfx('btn')},
+    lk:()=>{Tetris.c.s.forEach((r,y)=>r.forEach((v,x)=>{if(v&&Tetris.c.y+y>=0)Tetris.b[Tetris.c.y+y][Tetris.c.x+x]=Tetris.c.t}));let l=0;for(let y=19;y>=0;y--)if(Tetris.b[y].every(x=>x)){Tetris.b.splice(y,1);Tetris.b.unshift(Array(10).fill(0));l++;y++}if(l){App.score+=l*100;document.getElementById('score').innerText="SCORE: "+App.score;App.cheer();App.playSfx('merge')}Tetris.sp()},
+    dr:()=>{let x=Tetris.ctx;x.clearRect(0,0,200,400);let rc=(px,py,c,g)=>{x.fillStyle=g?'rgba(255,255,255,0.2)':Tetris.col[c];x.fillRect(px*20,py*20,19,19)};Tetris.b.forEach((r,y)=>r.forEach((v,px)=>{if(v)rc(px,y,v)}));if(Tetris.c){let gy=Tetris.c.y;while(!Tetris.h(0,1+(gy-Tetris.c.y)))gy++;Tetris.c.s.forEach((r,y)=>r.forEach((v,px)=>{if(v)rc(Tetris.c.x+px,gy+y,Tetris.c.t,true)}));Tetris.c.s.forEach((r,y)=>r.forEach((v,px)=>{if(v)rc(Tetris.c.x+px,Tetris.c.y+y,Tetris.c.t)}))}}
+};
+
+// --- 7. Twenty ---
+const Twenty={
+    g:[], w:5, h:5,
+    i:()=>{document.getElementById('tools').innerHTML=`<button class="btn" onclick="App.playSfx('btn');Twenty.st(5)">5x5</button><button class="btn" onclick="App.playSfx('btn');Twenty.st(6)">6x6</button><button class="btn" onclick="App.playSfx('btn');Twenty.st(7)">7x7</button>`;Twenty.st(5)},
+    st:(n)=>{Twenty.w=n;Twenty.h=n;document.getElementById('stage').innerHTML=`<div id="tw-b" class="grid-std" style="grid-template-columns:repeat(${n},1fr);gap:4px;"></div>`;Twenty.g=Array(n*n).fill(0).map(()=>({v:Math.ceil(Math.random()*3),s:false}));Twenty.dr()},
+    dr:()=>{let b=document.getElementById('tw-b');b.innerHTML='';Twenty.g.forEach((t,i)=>{let d=document.createElement('div');d.className='std-c'+(t.s?' on':'');d.innerText=t.v;d.style.background=`hsl(${190+t.v*12},65%,${92-t.v*3}%)`;d.onclick=()=>Twenty.clk(i);b.appendChild(d)})},
+    clk:(i)=>{let s=Twenty.g.findIndex(t=>t.s);if(s==-1)Twenty.g[i].s=true;else if(s==i)Twenty.g[i].s=false;else{let r1=Math.floor(s/Twenty.w),c1=s%Twenty.w,r2=Math.floor(i/Twenty.w),c2=i%Twenty.w;if(Math.abs(r1-r2)+Math.abs(c1-c2)==1&&Twenty.g[s].v==Twenty.g[i].v){Twenty.g[i].v++;Twenty.g[s]=null;Twenty.g[i].s=false;App.score+=Twenty.g[i].v*10;App.cheer();App.playSfx('merge');Twenty.dp()}else{Twenty.g[s].s=false;Twenty.g[i].s=true}}Twenty.dr()},
+    dp:()=>{for(let c=0;c<Twenty.w;c++){let l=[];for(let r=0;r<Twenty.h;r++)if(Twenty.g[r*Twenty.w+c])l.push(Twenty.g[r*Twenty.w+c]);while(l.length<Twenty.h)l.unshift({v:Math.ceil(Math.random()*4),s:false});for(let r=0;r<Twenty.h;r++)Twenty.g[r*Twenty.w+c]=l[r]}Twenty.dr()}
+};
+
+// --- 8. Sudoku ---
+const Sudoku={
+    i:()=>{document.getElementById('chk').classList.remove('hidden');document.getElementById('stage').innerHTML=`<div class="grid-std" id="su-b" style="grid-template-columns:repeat(9,1fr);gap:1px;background:#90a4ae"></div>`;let p=[5,3,0,0,7,0,0,0,0,6,0,0,1,9,5,0,0,0,0,9,8,0,0,0,0,6,0,8,0,0,0,6,0,0,0,3,4,0,0,8,0,3,0,0,1,7,0,0,0,2,0,0,0,6,0,6,0,0,0,0,2,8,0,0,0,0,4,1,9,0,0,5,0,0,0,0,8,0,0,7,9];p.forEach(v=>{let d=document.createElement('div');d.className='std-c';d.style.borderRadius=0;if(v){d.innerText=v;d.style.background='#eceff1'}else{let i=document.createElement('input');i.type='tel';i.maxLength=1;i.style.cssText="width:100%;height:100%;border:none;text-align:center;font-size:1rem;color:#546e7a;font-weight:bold;";d.appendChild(i)}document.getElementById('su-b').appendChild(d)})},
+    chk:()=>{let ok=true;document.querySelectorAll('input').forEach(i=>{if(!i.value)ok=false});if(ok){App.score=100;document.getElementById('score').innerText="SCORE: 100";App.cheer();App.playSfx('win');alert("全對！")}else alert("還有空格喔")}
+};
+</script>
+</body>
+</html>
